@@ -12,6 +12,16 @@ from lab_4_retrieval_w_clustering.main import (
     VectorDBTreeSearchEngine,
 )
 
+from lab_4_retrieval_w_clustering.main import (
+    BM25Vectorizer,
+    ClusteringSearchEngine,
+    DocumentVectorDB,
+    get_paragraphs,
+    VectorDBAdvancedSearchEngine,
+    VectorDBSearchEngine,
+    VectorDBTreeSearchEngine,
+)
+
 
 def open_files() -> tuple[list[str], list[str]]:
     """
@@ -58,32 +68,55 @@ def main() -> None:
     Launch an implementation.
     """
     documents, stopwords = open_files()
-    paragraphs = get_paragraphs(''.join(documents))
+    paragraphs = []
+    paragraphs_together = []
+    for document in documents:
+        doc_paragraphs = get_paragraphs(document)
+        paragraphs.append(doc_paragraphs)
+        paragraphs_together.extend(doc_paragraphs)
 
-    query = 'Первый был не кто иной, как Михаил Александрович Берлиоз, председатель правления'
+    query = "Первый был не кто иной, как Михаил Александрович Берлиоз, председатель правления"
+    n_neighbours = 5
 
-    db = DocumentVectorDB(stopwords)
-    db.put_corpus(paragraphs)
-
-    vector_search = VectorDBSearchEngine(db)
-    result_1 = vector_search.retrieve_relevant_documents(query, 3)
-    print('VectorDBSearchEngine: ', result_1)
+    vectorizer = BM25Vectorizer()
+    vectorizer.set_tokenized_corpus(paragraphs)
+    vectorizer.build()
+    document_vector = vectorizer.vectorize(paragraphs[0])
+    print(document_vector)
     print()
 
-    clustering_search = ClusteringSearchEngine(db)
-    result_2 = clustering_search.retrieve_relevant_documents(query, 5)
-    print('ClusteringSearchEngine: ', result_2)
+    database = DocumentVectorDB(stopwords)
+    database.put_corpus(paragraphs_together)
 
-    tree_search = VectorDBTreeSearchEngine(db)
-    result_3 = tree_search.retrieve_relevant_documents(query, 1)
-    print('VectorDBTreeSearchEngine: ', result_3)
+    database_searcher = VectorDBSearchEngine(database)
+    db_relevant_documents = database_searcher.retrieve_relevant_documents(query, n_neighbours)
+    for db_relevant_document in db_relevant_documents:
+        print(db_relevant_document)
     print()
 
-    advanced_search = VectorDBAdvancedSearchEngine(db)
-    result_4 = advanced_search.retrieve_relevant_documents(query, 5)
+    for cluster_number in range(4, 5):
+        clustering_searcher = ClusteringSearchEngine(database, cluster_number)
+        print(f"For {cluster_number} cluster(s) the error is "
+              f"{clustering_searcher.calculate_square_sum()}")
+        cl_relevant_documents = clustering_searcher.retrieve_relevant_documents(query, n_neighbours)
+        clustering_searcher.make_report(3, "assets/report.json")
+        for cl_relevant_document in cl_relevant_documents:
+            print(cl_relevant_document)
+        print()
 
-    result = result_4
+    tree_searcher = VectorDBTreeSearchEngine(database)
+    basic_relevant_documents = tree_searcher.retrieve_relevant_documents(query, 1)
+    for tree_relevant_document in basic_relevant_documents:
+        print(tree_relevant_document)
+    print()
 
+    advanced_searcher = VectorDBAdvancedSearchEngine(database)
+    adv_relevant_documents = advanced_searcher.retrieve_relevant_documents(query, n_neighbours)
+    for adv_relevant_document in adv_relevant_documents:
+        print(adv_relevant_document)
+    print()
+
+    result = adv_relevant_documents
     assert result, "Result is None"
 
 
